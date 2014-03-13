@@ -20,3 +20,6 @@
 #stuff
 *~
 *.out
+*.trace
+*.swp
+polyhedron
