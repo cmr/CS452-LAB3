@@ -22,6 +22,7 @@ static VERTEX_SHADER: &'static str = "\
 uniform mat4 xform;
 uniform vec3 rot;
 uniform float scale;
+uniform int draw_black;
 
 in vec3 position;
 in vec3 color;
@@ -33,6 +34,7 @@ void main() {
     vec3 rrot = radians(rot);
     vec3 s = sin(rrot);
     vec3 c = cos(rrot);
+    float scale_ = scale;
 
     mat4 rxm = mat4( 1, 0, 0, 0,
                      0, c.x, s.x, 0,
@@ -49,9 +51,13 @@ void main() {
                      0, 0, 1, 0,
                      0, 0, 0, 1);
 
-    mat4 scale = mat4(scale, 0, 0, 0,
-                      0, scale, 0, 0,
-                      0, 0, scale, 0,
+    if (draw_black == 1) {
+        scale_ += 0.0001;
+    }
+
+    mat4 scale = mat4(scale_, 0, 0, 0,
+                      0, scale_, 0, 0,
+                      0, 0, scale_, 0,
                       0, 0, 0, 1);
 
     //gl_Position = trans * scale * rotx * roty * pos;
@@ -115,6 +121,7 @@ fn main(argc: int, argv: **u8) -> int {
     native::start(argc, argv, proc() {
         glfw::set_error_callback(box glfw::LogErrorHandler);
         glfw::start(proc() {
+            glfw::window_hint::samples(4);
             glfw::window_hint::context_version(3, 2);
             glfw::window_hint::opengl_profile(glfw::OpenGlCoreProfile);
             let window = glfw::Window::create(800, 600, "Lab 3", glfw::Windowed).unwrap();
@@ -198,10 +205,10 @@ fn main(argc: int, argv: **u8) -> int {
                             debug!("rz is {}", rx)
                         },
                         glfw::KeyEvent(glfw::KeyE, _, _, _) => {
-                            scale += 0.1;
+                            scale += 0.01;
                         },
                         glfw::KeyEvent(glfw::KeyQ, _, _, _) => {
-                            scale -= 0.1;
+                            scale -= 0.01;
                         },
                         _ => { }
                     }
