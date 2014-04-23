@@ -1,18 +1,23 @@
-#[crate_id = "polyhedron"];
-#[no_uv];
+#![crate_id = "polyhedron"]
+#![feature(phase)]
 
+#[phase(link, syntax)]
+extern crate log;
 extern crate native;
 
 extern crate gl;
 extern crate hgl;
-extern crate glfw = "glfw-rs";
+extern crate glfw;
 extern crate cgmath;
+
+use cgmath::matrix::Matrix4;
+use cgmath::array::Array;
 
 use gl::types::{GLfloat, GLuint};
 use std::mem::size_of;
 
-use cgmath::matrix::Mat4;
-use cgmath::array::Array;
+use glfw::Context;
+
 use gl::types::GLint;
 use hgl::{Shader, Program, Triangles, Vbo, Vao, Ebo};
 
@@ -119,117 +124,117 @@ static INDICES: &'static [GLuint] = &[
 #[start]
 fn main(argc: int, argv: **u8) -> int {
     native::start(argc, argv, proc() {
-        glfw::set_error_callback(box glfw::LogErrorHandler);
-        glfw::start(proc() {
-            glfw::window_hint::samples(4);
-            glfw::window_hint::context_version(3, 2);
-            glfw::window_hint::opengl_profile(glfw::OpenGlCoreProfile);
-            let window = glfw::Window::create(800, 600, "Lab 3", glfw::Windowed).unwrap();
+        let glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+        glfw.window_hint(glfw::Samples(4));
+        glfw.window_hint(glfw::ContextVersion(3, 2));
+        glfw.window_hint(glfw::OpenglProfile(glfw::OpenGlCoreProfile));
 
-            let (mut rx, mut ry, mut rz) = (0.0, 0.0, 0.0);
-            let mut scale = 1.0;
+        let (window, events) = glfw.create_window(800, 600, "Lab 3", glfw::Windowed).unwrap();
 
-            window.set_mouse_button_polling(true);
-            window.set_key_polling(true);
-            window.make_context_current();
-            gl::load_with(glfw::get_proc_address);
+        let (mut rx, mut ry, mut rz) = (0.0, 0.0, 0.0);
+        let mut scale = 1.0;
 
-            gl::Viewport(0, 0, 800, 600);
-            gl::ClearColor(0.0, 0.0, 0.0, 1.0);
-            gl::Enable(gl::DEPTH_TEST);
-            gl::DepthFunc(gl::LEQUAL);
+        window.set_mouse_button_polling(true);
+        window.set_key_polling(true);
+        window.make_current();
 
-            let vao = Vao::new(); vao.bind();
+        gl::load_with(|p| glfw.get_proc_address(p));
 
-            let program = Program::link([
-                Shader::compile(VERTEX_SHADER, hgl::VertexShader).unwrap(),
-                Shader::compile(FRAGMENT_SHADER, hgl::FragmentShader).unwrap()
-            ]).unwrap();
+        gl::Viewport(0, 0, 800, 600);
+        gl::ClearColor(0.0, 0.0, 0.0, 1.0);
+        gl::Enable(gl::DEPTH_TEST);
+        gl::DepthFunc(gl::LEQUAL);
 
-            program.bind_frag(0, "out_color");
-            program.bind();
+        let vao = Vao::new(); vao.bind();
 
-            let _vbo = Vbo::from_data(VERTICES, hgl::buffer::StaticDraw);
-            let _ebo = Ebo::from_indices(INDICES);
+        let program = Program::link([
+            Shader::compile(VERTEX_SHADER, hgl::VertexShader).unwrap(),
+            Shader::compile(FRAGMENT_SHADER, hgl::FragmentShader).unwrap()
+        ]).unwrap();
 
-            vao.enable_attrib(&program, "position", gl::FLOAT, 3, 6*std::mem::size_of::<GLfloat>() as GLint, 0);
-            vao.enable_attrib(&program, "color", gl::FLOAT, 3, 6*std::mem::size_of::<GLfloat>() as GLint, 3*std::mem::size_of::<GLfloat>());
+        program.bind_frag(0, "out_color");
+        program.bind();
 
-            let tpos = program.uniform("xform");
-            let rpos = program.uniform("rot");
-            let spos = program.uniform("scale");
+        let _vbo = Vbo::from_data(VERTICES, hgl::buffer::StaticDraw);
+        let _ebo = Ebo::from_indices(INDICES);
 
-            let black = program.uniform("draw_black");
+        vao.enable_attrib(&program, "position", gl::FLOAT, 3, 6*std::mem::size_of::<GLfloat>() as GLint, 0);
+        vao.enable_attrib(&program, "color", gl::FLOAT, 3, 6*std::mem::size_of::<GLfloat>() as GLint, 3*std::mem::size_of::<GLfloat>());
 
-            let mut xform: Mat4<f32> = Mat4::identity();
+        let tpos = program.uniform("xform");
+        let rpos = program.uniform("rot");
+        let spos = program.uniform("scale");
 
-            while !window.should_close() {
-                glfw::poll_events();
+        let black = program.uniform("draw_black");
 
-                for (_, event) in window.flush_events() {
-                    match event {
-                        glfw::KeyEvent(glfw::KeyW, _, _, _) => {
-                            xform.w.y += 0.1;
-                        },
-                        glfw::KeyEvent(glfw::KeyS, _, _, _) => {
-                            xform.w.y -= 0.1;
-                        },
-                        glfw::KeyEvent(glfw::KeyD, _, _, _) => {
-                            xform.w.x += 0.1;
-                        },
-                        glfw::KeyEvent(glfw::KeyA, _, _, _) => {
-                            xform.w.x -= 0.1;
-                        },
-                        glfw::KeyEvent(glfw::KeyI, _, _, _) => {
-                            rx += 1.0;
-                            debug!("rx is {}", ry)
-                        },
-                        glfw::KeyEvent(glfw::KeyK, _, _, _) => {
-                            rx -= 1.0;
-                            debug!("rx is {}", ry)
-                        },
-                        glfw::KeyEvent(glfw::KeyJ, _, _, _) => {
-                            ry += 1.0;
-                            debug!("ry is {}", rx)
-                        },
-                        glfw::KeyEvent(glfw::KeyL, _, _, _) => {
-                            ry -= 1.0;
-                            debug!("ry is {}", rx)
-                        },
-                        glfw::KeyEvent(glfw::KeyU, _, _, _) => {
-                            rz += 1.0;
-                            debug!("rz is {}", rx)
-                        },
-                        glfw::KeyEvent(glfw::KeyO, _, _, _) => {
-                            rz -= 1.0;
-                            debug!("rz is {}", rx)
-                        },
-                        glfw::KeyEvent(glfw::KeyE, _, _, _) => {
-                            scale += 0.01;
-                        },
-                        glfw::KeyEvent(glfw::KeyQ, _, _, _) => {
-                            scale -= 0.01;
-                        },
-                        _ => { }
-                    }
+        let mut xform: Matrix4<f32> = Matrix4::identity();
+
+        while !window.should_close() {
+            glfw.poll_events();
+
+            for (_, event) in glfw::flush_messages(&events) {
+                match event {
+                    glfw::KeyEvent(glfw::KeyW, _, _, _) => {
+                        xform.w.y += 0.1;
+                    },
+                    glfw::KeyEvent(glfw::KeyS, _, _, _) => {
+                        xform.w.y -= 0.1;
+                    },
+                    glfw::KeyEvent(glfw::KeyD, _, _, _) => {
+                        xform.w.x += 0.1;
+                    },
+                    glfw::KeyEvent(glfw::KeyA, _, _, _) => {
+                        xform.w.x -= 0.1;
+                    },
+                    glfw::KeyEvent(glfw::KeyI, _, _, _) => {
+                        rx += 1.0;
+                        debug!("rx is {}", ry)
+                    },
+                    glfw::KeyEvent(glfw::KeyK, _, _, _) => {
+                        rx -= 1.0;
+                        debug!("rx is {}", ry)
+                    },
+                    glfw::KeyEvent(glfw::KeyJ, _, _, _) => {
+                        ry += 1.0;
+                        debug!("ry is {}", rx)
+                    },
+                    glfw::KeyEvent(glfw::KeyL, _, _, _) => {
+                        ry -= 1.0;
+                        debug!("ry is {}", rx)
+                    },
+                    glfw::KeyEvent(glfw::KeyU, _, _, _) => {
+                        rz += 1.0;
+                        debug!("rz is {}", rx)
+                    },
+                    glfw::KeyEvent(glfw::KeyO, _, _, _) => {
+                        rz -= 1.0;
+                        debug!("rz is {}", rx)
+                    },
+                    glfw::KeyEvent(glfw::KeyE, _, _, _) => {
+                        scale += 0.01;
+                    },
+                    glfw::KeyEvent(glfw::KeyQ, _, _, _) => {
+                        scale -= 0.01;
+                    },
+                    _ => { }
                 }
-
-                gl::Uniform3f(rpos, rx, ry, rz);
-                gl::Uniform1f(spos, scale);
-
-                unsafe {
-                    gl::UniformMatrix4fv(tpos, 1, gl::FALSE, xform.as_slice().as_ptr() as *GLfloat);
-                }
-
-                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-                vao.draw_elements(hgl::Triangles, 0, 36);
-                gl::Uniform1i(black, 1);
-                vao.draw_elements(hgl::LineStrip, 0, 36);
-                gl::Uniform1i(black, 0);
-
-                window.swap_buffers();
             }
-        });
+
+            gl::Uniform3f(rpos, rx, ry, rz);
+            gl::Uniform1f(spos, scale);
+
+            unsafe {
+                gl::UniformMatrix4fv(tpos, 1, gl::FALSE, xform.as_slice().as_ptr() as *GLfloat);
+            }
+
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+            vao.draw_elements(hgl::Triangles, 0, 36);
+            gl::Uniform1i(black, 1);
+            vao.draw_elements(hgl::LineStrip, 0, 36);
+            gl::Uniform1i(black, 0);
+
+            window.swap_buffers();
+        }
     });
     0
 }
